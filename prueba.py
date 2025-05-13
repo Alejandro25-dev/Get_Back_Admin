@@ -10,9 +10,7 @@ import threading
 import uvicorn
 from datetime import datetime
 
-# Crear la aplicación FastAPI
 app = FastAPI()
-
 # Almacenamiento en memoria para las imágenes base64
 imagenes_base64 = {}
 
@@ -21,13 +19,14 @@ session = requests.Session()
 
 # Credenciales para autenticación digest
 username = "admin"
-password = "Bolidec0"
+password = "admin"
 
 # URLs para las diferentes peticiones
-login_url = "http://172.16.1.248/API/Web/Login"
-alarm_url = "http://172.16.1.248/API/AI/processAlarm/Get"
-position_url = "http://172.16.1.248/API/AI/Setup/FD/Get"
-heartbeat_url = "http://172.16.1.248/API/Login/Heartbeat"
+login_url = "http://172.16.2.223/API/Web/Login"
+alarm_url = "http://172.16.2.223/API/AI/processAlarm/Get"
+position_url = "http://172.16.2.223/API/AI/Setup/FD/Get"
+heartbeat_url = "http://172.16.2.223/API/Login/Heartbeat"
+face_url = "http://172.16.2.223/API/AI/Setup/FD/Set"
 
 
 def heartbeat(session, auth, headers, stop_event):
@@ -136,6 +135,43 @@ def monitorear_alarmas():
         
                                 if rule_rect:
                                     print(rule_rect)
+                                    
+                        # Enviar configuración facial después de 5 segundos
+                        print("Esperando unos segundos antes de enviar la configuración...")
+                        time.sleep(0.5)
+                        print("Enviando configuración facial...")
+                        
+                        # Configuración facial a enviar
+                        datos_config = {
+                            "version": "1.0",
+                            "data": {
+                                "channel_info": {
+                                    "CH1": {
+                                        "face_attribute": True,
+                                        "face_recognition": True,
+                                    }
+                                },
+                                "page_type": "ChannelConfig"  
+                            }
+                        }
+                        
+                        # Enviar la solicitud POST con la misma sesión y headers
+                        face_response = session.post(
+                            face_url,
+                            auth=HTTPDigestAuth(username, password),
+                            headers=headers,
+                            json=datos_config,
+                            verify=False
+                        )
+                        
+                        print(f"Estado de la solicitud a {face_url}: {face_response.status_code}")
+                        
+                        if face_response.status_code == 200:
+                            print("Configuración enviada exitosamente")
+                            print(json.dumps(face_response.json(), indent=2))
+                        else:
+                            print(f"Error en la solicitud: {face_response.status_code}")
+                            print(f"Respuesta: {face_response.text}")
                 
                     except KeyError:
                        print("No hay datos de rostros disponibles en este momento")
@@ -159,11 +195,19 @@ def monitorear_alarmas():
         print("\nCerrando sesión...")
         session.close()
 
+
+
 if __name__ == "__main__":
     # Iniciar el monitoreo de alarmas en un hilo separado
     monitoring_thread = threading.Thread(target=monitorear_alarmas)
     monitoring_thread.daemon = True
     monitoring_thread.start()
+
     
     # Iniciar el servidor FastAPI
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+
+
+
